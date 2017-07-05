@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Microsoft.AspNetCore.Razor.Language.Intermediate;
@@ -109,7 +110,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
 
             public override void VisitNamespaceDeclaration(NamespaceDeclarationIntermediateNode node)
             {
-                using (Context.CodeWriter.BuildNamespace(node.Content))
+                using (Context.CodeWriter.BuildNamespaceDeclaration(node.Content))
                 {
                     Context.CodeWriter.WriteLine("#line hidden");
                     VisitDefault(node);
@@ -118,7 +119,18 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
 
             public override void VisitClassDeclaration(ClassDeclarationIntermediateNode node)
             {
-                using (Context.CodeWriter.BuildClassDeclaration(node.Modifiers, node.Name, node.BaseType, node.Interfaces))
+                var baseTypes = new List<string>();
+                if (node.BaseType != null)
+                {
+                    baseTypes.Add(node.BaseType);
+                }
+
+                if (node.Interfaces != null)
+                {
+                    baseTypes.AddRange(node.Interfaces);
+                }
+
+                using (Context.CodeWriter.BuildClassDeclaration(node.Modifiers, node.Name, baseTypes))
                 {
                     VisitDefault(node);
                 }
@@ -150,7 +162,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
 
             public override void VisitFieldDeclaration(FieldDeclarationIntermediateNode node)
             {
-                Context.CodeWriter.WriteField(node.Modifiers, node.Type, node.Name);
+                Context.CodeWriter.WriteFieldDeclaration(node.Modifiers, node.Type, node.Name);
             }
 
             public override void VisitPropertyDeclaration(PropertyDeclarationIntermediateNode node)

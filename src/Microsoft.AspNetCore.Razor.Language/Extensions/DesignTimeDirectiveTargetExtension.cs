@@ -49,7 +49,7 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
                 .Write("((")
                 .Write(typeof(Action).FullName)
                 .Write(")(");
-            using (context.CodeWriter.BuildLambda())
+            using (context.CodeWriter.BuildLambdaExpression())
             {
                 var originalIndent = context.CodeWriter.CurrentIndent;
                 context.CodeWriter.CurrentIndent = 0;

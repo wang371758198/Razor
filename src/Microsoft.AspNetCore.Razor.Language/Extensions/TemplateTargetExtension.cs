@@ -20,7 +20,7 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
                 .Write(ItemParameterName).Write(" => ")
                 .WriteStartNewObject(TemplateTypeName);
 
-            using (context.CodeWriter.BuildAsyncLambda(TemplateWriterName))
+            using (context.CodeWriter.BuildAsyncLambdaExpression(TemplateWriterName))
             {
                 context.NodeWriter.BeginWriterScope(context, TemplateWriterName);
 
@@ -29,7 +29,7 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
                 context.NodeWriter.EndWriterScope(context);
             }
 
-            context.CodeWriter.WriteEndMethodInvocation(endLine: false);
+            context.CodeWriter.WriteEndMethodCall(endLine: false);
         }
     }
 }

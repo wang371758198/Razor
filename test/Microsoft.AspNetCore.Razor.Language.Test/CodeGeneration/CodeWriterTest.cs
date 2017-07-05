@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
 {
-    public class CSharpCodeWriterTest
+    public class CodeWriterTest
     {
         // The length of the newline string written by writer.WriteLine.
         private static readonly int WriterNewLineLength = Environment.NewLine.Length;
@@ -26,7 +26,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
         }
 
         [Fact]
-        public void CSharpCodeWriter_TracksPosition_WithWrite()
+        public void CodeWriter_TracksPosition_WithWrite()
         {
             // Arrange
             var writer = new CodeWriter();
@@ -42,7 +42,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
         }
 
         [Fact]
-        public void CSharpCodeWriter_TracksPosition_WithIndent()
+        public void CodeWriter_TracksPosition_WithIndent()
         {
             // Arrange
             var writer = new CodeWriter();
@@ -59,7 +59,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
         }
 
         [Fact]
-        public void CSharpCodeWriter_TracksPosition_WithWriteLine()
+        public void CodeWriter_TracksPosition_WithWriteLine()
         {
             // Arrange
             var writer = new CodeWriter();
@@ -77,7 +77,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
 
         [Theory]
         [MemberData(nameof(NewLines))]
-        public void CSharpCodeWriter_TracksPosition_WithWriteLine_WithNewLineInContent(string newLine)
+        public void CodeWriter_TracksPosition_WithWriteLine_WithNewLineInContent(string newLine)
         {
             // Arrange
             var writer = new CodeWriter();
@@ -98,7 +98,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
 
         [Theory]
         [MemberData(nameof(NewLines))]
-        public void CSharpCodeWriter_TracksPosition_WithWrite_WithNewlineInContent(string newLine)
+        public void CodeWriter_TracksPosition_WithWrite_WithNewlineInContent(string newLine)
         {
             // Arrange
             var writer = new CodeWriter();
@@ -118,7 +118,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
         }
 
         [Fact]
-        public void CSharpCodeWriter_TracksPosition_WithWrite_WithNewlineInContent_RepeatedN()
+        public void CodeWriter_TracksPosition_WithWrite_WithNewlineInContent_RepeatedN()
         {
             // Arrange
             var writer = new CodeWriter();
@@ -138,7 +138,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
         }
 
         [Fact]
-        public void CSharpCodeWriter_TracksPosition_WithWrite_WithMixedNewlineInContent()
+        public void CodeWriter_TracksPosition_WithWrite_WithMixedNewlineInContent()
         {
             // Arrange
             var writer = new CodeWriter();
@@ -158,7 +158,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
         }
 
         [Fact]
-        public void CSharpCodeWriter_TracksPosition_WithNewline_SplitAcrossWrites()
+        public void CodeWriter_TracksPosition_WithNewline_SplitAcrossWrites()
         {
             // Arrange
             var writer = new CodeWriter();
@@ -179,7 +179,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
         }
 
         [Fact]
-        public void CSharpCodeWriter_TracksPosition_WithTwoNewline_SplitAcrossWrites_R()
+        public void CodeWriter_TracksPosition_WithTwoNewline_SplitAcrossWrites_R()
         {
             // Arrange
             var writer = new CodeWriter();
@@ -200,7 +200,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
         }
 
         [Fact]
-        public void CSharpCodeWriter_TracksPosition_WithTwoNewline_SplitAcrossWrites_N()
+        public void CodeWriter_TracksPosition_WithTwoNewline_SplitAcrossWrites_N()
         {
             // Arrange
             var writer = new CodeWriter();
@@ -221,7 +221,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
         }
 
         [Fact]
-        public void CSharpCodeWriter_TracksPosition_WithTwoNewline_SplitAcrossWrites_Reversed()
+        public void CodeWriter_TracksPosition_WithTwoNewline_SplitAcrossWrites_Reversed()
         {
             // Arrange
             var writer = new CodeWriter();
@@ -242,7 +242,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
         }
 
         [Fact]
-        public void CSharpCodeWriter_TracksPosition_WithNewline_SplitAcrossWrites_AtBeginning()
+        public void CodeWriter_TracksPosition_WithNewline_SplitAcrossWrites_AtBeginning()
         {
             // Arrange
             var writer = new CodeWriter();
@@ -263,42 +263,46 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
         }
 
         [Fact]
-        public void WriteLineNumberDirective_UsesFilePath_WhenFileInSourceLocationIsNull()
+        public void CodeWriter_BuildLineDirective_IsNoOp_WithoutFilePath()
         {
             // Arrange
-            var filePath = "some-path";
             var writer = new CodeWriter();
-            var expected = $"#line 5 \"{filePath}\"" + writer.NewLine;
-            var sourceLocation = new SourceLocation(10, 4, 3);
-            var mappingLocation = new SourceSpan(sourceLocation, 9);
+            var span = new SourceSpan(null, 10, 4, 3, 9);
 
             // Act
-            writer.WriteLineNumberDirective(mappingLocation, filePath);
-            var code = writer.GenerateCode();
+            using (writer.BuildLineDirective(span))
+            {
+                writer.Write("Inside");
+            }
 
             // Assert
-            Assert.Equal(expected, code);
+            var code = writer.GenerateCode();
+            Assert.Equal("Inside", code);
         }
 
-        [Theory]
-        [InlineData("")]
-        [InlineData("source-location-file-path")]
-        public void WriteLineNumberDirective_UsesSourceLocationFilePath_IfAvailable(
-            string sourceLocationFilePath)
+        [Fact]
+        public void CodeWriter_BuildLineDirective_GeneratesLineDirective_WithFilePath()
         {
             // Arrange
-            var filePath = "some-path";
             var writer = new CodeWriter();
-            var expected = $"#line 5 \"{sourceLocationFilePath}\"" + writer.NewLine;
-            var sourceLocation = new SourceLocation(sourceLocationFilePath, 10, 4, 3);
-            var mappingLocation = new SourceSpan(sourceLocation, 9);
+            var span = new SourceSpan("test.cshtml", 10, 4, 3, 9);
 
             // Act
-            writer.WriteLineNumberDirective(mappingLocation, filePath);
-            var code = writer.GenerateCode();
+            using (writer.BuildLineDirective(span))
+            {
+                writer.Write("Inside");
+            }
 
             // Assert
-            Assert.Equal(expected, code);
+            var code = writer.GenerateCode();
+            Assert.Equal(
+@"#line 5 ""test.cshtml""
+Inside
+
+#line default
+#line hidden
+",
+                code);
         }
 
         [Fact]
@@ -308,7 +312,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             var writer = new CodeWriter();
 
             // Act
-            writer.WriteField(new[] { "private" }, "global::System.String", "_myString");
+            writer.WriteFieldDeclaration(new[] { "private" }, "global::System.String", "_myString");
 
             // Assert
             var output = writer.GenerateCode();
@@ -322,7 +326,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             var writer = new CodeWriter();
 
             // Act
-            writer.WriteField(new[] { "private", "readonly", "static" }, "global::System.String", "_myString");
+            writer.WriteFieldDeclaration(new[] { "private", "readonly", "static" }, "global::System.String", "_myString");
 
             // Assert
             var output = writer.GenerateCode();

@@ -20,6 +20,10 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Extensions
 
         private static readonly string[] PublicModifiers = new[] { "public" };
 
+        private static readonly string[] PrivateReadOnlyModifiers = new[] { "private", "readonly" };
+
+        private static readonly string[] PublicOverrideAsyncModifiers = new[] { "public", "override", "async" };
+
         protected override void ExecuteCore(RazorCodeDocument codeDocument, DocumentIntermediateNode documentNode)
         {
             var @namespace = documentNode.FindPrimaryNamespace();
@@ -161,16 +165,13 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Extensions
             BuildTargetElementString(writer, tagHelper);
 
             // Initialize declaration.
-            var tagHelperTypeName = "Microsoft.AspNetCore.Razor.TagHelpers.TagHelper";
+            var baseTypes = new string[] { "Microsoft.AspNetCore.Razor.TagHelpers.TagHelper" };
             var className = context.GetClassName(tagHelper);
 
-            using (writer.BuildClassDeclaration(PublicModifiers, className, tagHelperTypeName, interfaces: null))
+            using (writer.BuildClassDeclaration(PublicModifiers, className, baseTypes))
             {
                 // Add view component helper.
-                writer.WriteVariableDeclaration(
-                    $"private readonly global::Microsoft.AspNetCore.Mvc.IViewComponentHelper",
-                    "_helper",
-                    value: null);
+                writer.WriteFieldDeclaration(PrivateReadOnlyModifiers, "global::Microsoft.AspNetCore.Mvc.IViewComponentHelper", "_helper", "null");
 
                 // Add constructor.
                 BuildConstructorString(writer, className);
@@ -192,9 +193,7 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Extensions
                 .WriteLine(")");
             using (writer.BuildScope())
             {
-                writer.WriteStartAssignment("_helper")
-                    .Write("helper")
-                    .WriteLine(";");
+                writer.WriteAssignmentStatement("_helper", "helper");
             }
         }
 
@@ -222,7 +221,7 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Extensions
                 {
                     writer.Write(" = ")
                         .WriteStartNewObject(attribute.TypeName)
-                        .WriteEndMethodInvocation();
+                        .WriteEndMethodCall();
                 }
             }
         }
@@ -233,16 +232,16 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Extensions
             var outputVariable = "output";
 
             using (writer.BuildMethodDeclaration(
-                    $"public override async",
+                    PublicOverrideAsyncModifiers,
                     $"global::{typeof(Task).FullName}",
                     "ProcessAsync",
-                    new Dictionary<string, string>()
+                    new[]
                     {
-                        { "Microsoft.AspNetCore.Razor.TagHelpers.TagHelperContext", contextVariable },
-                        { "Microsoft.AspNetCore.Razor.TagHelpers.TagHelperOutput", outputVariable }
+                        ("Microsoft.AspNetCore.Razor.TagHelpers.TagHelperContext", contextVariable),
+                        ("Microsoft.AspNetCore.Razor.TagHelpers.TagHelperOutput", outputVariable),
                     }))
             {
-                writer.WriteInstanceMethodInvocation(
+                writer.WriteInstanceMethodCall(
                     $"(_helper as global::Microsoft.AspNetCore.Mvc.ViewFeatures.IViewContextAware)?",
                     "Contextualize",
                     new[] { "ViewContext" });
@@ -251,10 +250,10 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Extensions
                 var contentVariable = "content";
                 writer.Write("var ")
                     .WriteStartAssignment(contentVariable)
-                    .WriteInstanceMethodInvocation($"await _helper", "InvokeAsync", methodParameters);
+                    .WriteInstanceMethodCall($"await _helper", "InvokeAsync", methodParameters);
                 writer.WriteStartAssignment($"{outputVariable}.TagName")
                     .WriteLine("null;");
-                writer.WriteInstanceMethodInvocation(
+                writer.WriteInstanceMethodCall(
                     $"{outputVariable}.Content",
                     "SetHtmlContent",
                     new[] { contentVariable });
@@ -278,8 +277,8 @@ namespace Microsoft.AspNetCore.Mvc.Razor.Extensions
             var rule = tagHelper.TagMatchingRules.First();
 
             writer.Write("[")
-                .WriteStartMethodInvocation("Microsoft.AspNetCore.Razor.TagHelpers.HtmlTargetElementAttribute")
-                .WriteStringLiteral(rule.TagName)
+                .WriteStartMethodCall("Microsoft.AspNetCore.Razor.TagHelpers.HtmlTargetElementAttribute")
+                .WriteStringLiteralExpression(rule.TagName)
                 .WriteLine(")]");
         }
 

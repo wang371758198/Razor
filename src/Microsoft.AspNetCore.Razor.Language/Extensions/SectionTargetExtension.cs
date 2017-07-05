@@ -27,17 +27,17 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
             var writerName = context.Options.DesignTime ? DefaultWriterName : string.Empty;
 
             context.CodeWriter
-                .WriteStartMethodInvocation(SectionMethodName)
+                .WriteStartMethodCall(SectionMethodName)
                 .Write("\"")
                 .Write(node.Name)
                 .Write("\", ");
 
-            using (context.CodeWriter.BuildAsyncLambda(writerName))
+            using (context.CodeWriter.BuildAsyncLambdaExpression(writerName))
             {
                 context.RenderChildren(node);
             }
 
-            context.CodeWriter.WriteEndMethodInvocation(endLine: true);
+            context.CodeWriter.WriteEndMethodCall(endLine: true);
         }
     }
 }

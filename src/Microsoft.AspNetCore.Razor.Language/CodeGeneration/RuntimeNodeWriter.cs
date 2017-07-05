@@ -30,16 +30,9 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
 
         public override void WriteUsingDirective(CodeRenderingContext context, UsingDirectiveIntermediateNode node)
         {
-            if (node.Source.HasValue)
+            using (context.CodeWriter.BuildLineDirective(node.Source))
             {
-                using (context.CodeWriter.BuildLinePragma(node.Source.Value))
-                {
-                    context.CodeWriter.WriteUsing(node.Content);
-                }
-            }
-            else
-            {
-                context.CodeWriter.WriteUsing(node.Content);
+                context.CodeWriter.WriteUsingDirective(node.Content);
             }
         }
 
@@ -58,11 +51,11 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             IDisposable linePragmaScope = null;
             if (node.Source != null)
             {
-                linePragmaScope = context.CodeWriter.BuildLinePragma(node.Source.Value);
+                linePragmaScope = context.CodeWriter.BuildLineDirective(node.Source.Value);
                 context.CodeWriter.WritePadding(WriteCSharpExpressionMethod.Length + 1, node.Source, context);
             }
 
-            context.CodeWriter.WriteStartMethodInvocation(WriteCSharpExpressionMethod);
+            context.CodeWriter.WriteStartMethodCall(WriteCSharpExpressionMethod);
 
             for (var i = 0; i < node.Children.Count; i++)
             {
@@ -77,7 +70,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
                 }
             }
 
-            context.CodeWriter.WriteEndMethodInvocation();
+            context.CodeWriter.WriteEndMethodCall();
 
             linePragmaScope?.Dispose();
         }
@@ -103,7 +96,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             IDisposable linePragmaScope = null;
             if (node.Source != null)
             {
-                linePragmaScope = context.CodeWriter.BuildLinePragma(node.Source.Value);
+                linePragmaScope = context.CodeWriter.BuildLineDirective(node.Source.Value);
                 context.CodeWriter.WritePadding(0, node.Source.Value, context);
             }
 
@@ -141,25 +134,25 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             var prefixLocation = node.Source.Value.AbsoluteIndex;
             var suffixLocation = node.Source.Value.AbsoluteIndex + node.Source.Value.Length - node.Suffix.Length;
             context.CodeWriter
-                .WriteStartMethodInvocation(BeginWriteAttributeMethod)
-                .WriteStringLiteral(node.AttributeName)
+                .WriteStartMethodCall(BeginWriteAttributeMethod)
+                .WriteStringLiteralExpression(node.AttributeName)
                 .WriteParameterSeparator()
-                .WriteStringLiteral(node.Prefix)
+                .WriteStringLiteralExpression(node.Prefix)
                 .WriteParameterSeparator()
                 .Write(prefixLocation.ToString(CultureInfo.InvariantCulture))
                 .WriteParameterSeparator()
-                .WriteStringLiteral(node.Suffix)
+                .WriteStringLiteralExpression(node.Suffix)
                 .WriteParameterSeparator()
                 .Write(suffixLocation.ToString(CultureInfo.InvariantCulture))
                 .WriteParameterSeparator()
                 .Write(valuePieceCount.ToString(CultureInfo.InvariantCulture))
-                .WriteEndMethodInvocation();
+                .WriteEndMethodCall();
 
             context.RenderChildren(node);
 
             context.CodeWriter
-                .WriteStartMethodInvocation(EndWriteAttributeMethod)
-                .WriteEndMethodInvocation();
+                .WriteStartMethodCall(EndWriteAttributeMethod)
+                .WriteEndMethodCall();
         }
 
         public override void WriteHtmlAttributeValue(CodeRenderingContext context, HtmlAttributeValueIntermediateNode node)
@@ -168,8 +161,8 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             var valueLocation = node.Source.Value.AbsoluteIndex + node.Prefix.Length;
             var valueLength = node.Source.Value.Length;
             context.CodeWriter
-                .WriteStartMethodInvocation(WriteAttributeValueMethod)
-                .WriteStringLiteral(node.Prefix)
+                .WriteStartMethodCall(WriteAttributeValueMethod)
+                .WriteStringLiteralExpression(node.Prefix)
                 .WriteParameterSeparator()
                 .Write(prefixLocation.ToString(CultureInfo.InvariantCulture))
                 .WriteParameterSeparator();
@@ -179,7 +172,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             {
                 if (node.Children[i] is IntermediateToken token && token.IsHtml)
                 {
-                    context.CodeWriter.WriteStringLiteral(token.Content);
+                    context.CodeWriter.WriteStringLiteralExpression(token.Content);
                 }
                 else
                 {
@@ -194,18 +187,18 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
                 .WriteParameterSeparator()
                 .Write(valueLength.ToString(CultureInfo.InvariantCulture))
                 .WriteParameterSeparator()
-                .WriteBooleanLiteral(true)
-                .WriteEndMethodInvocation();
+                .Write("true")
+                .WriteEndMethodCall();
         }
 
         public override void WriteCSharpExpressionAttributeValue(CodeRenderingContext context, CSharpExpressionAttributeValueIntermediateNode node)
         {
-            using (context.CodeWriter.BuildLinePragma(node.Source.Value))
+            using (context.CodeWriter.BuildLineDirective(node.Source.Value))
             {
                 var prefixLocation = node.Source.Value.AbsoluteIndex;
                 context.CodeWriter
-                    .WriteStartMethodInvocation(WriteAttributeValueMethod)
-                    .WriteStringLiteral(node.Prefix)
+                    .WriteStartMethodCall(WriteAttributeValueMethod)
+                    .WriteStringLiteralExpression(node.Prefix)
                     .WriteParameterSeparator()
                     .Write(prefixLocation.ToString(CultureInfo.InvariantCulture))
                     .WriteParameterSeparator();
@@ -231,8 +224,8 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
                     .WriteParameterSeparator()
                     .Write(valueLength.ToString(CultureInfo.InvariantCulture))
                     .WriteParameterSeparator()
-                    .WriteBooleanLiteral(false)
-                    .WriteEndMethodInvocation();
+                    .Write("false")
+                    .WriteEndMethodCall();
             }
         }
 
@@ -244,15 +237,15 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             var valueLocation = node.Source.Value.AbsoluteIndex + node.Prefix.Length;
             var valueLength = node.Source.Value.Length - node.Prefix.Length;
             context.CodeWriter
-                .WriteStartMethodInvocation(WriteAttributeValueMethod)
-                .WriteStringLiteral(node.Prefix)
+                .WriteStartMethodCall(WriteAttributeValueMethod)
+                .WriteStringLiteralExpression(node.Prefix)
                 .WriteParameterSeparator()
                 .Write(prefixLocation.ToString(CultureInfo.InvariantCulture))
                 .WriteParameterSeparator();
 
             context.CodeWriter.WriteStartNewObject(TemplateTypeName);
 
-            using (context.CodeWriter.BuildAsyncLambda(ValueWriterName))
+            using (context.CodeWriter.BuildAsyncLambdaExpression(ValueWriterName))
             {
                 BeginWriterScope(context, ValueWriterName);
 
@@ -266,7 +259,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
                         {
                             if (!isWhitespaceStatement)
                             {
-                                linePragmaScope = context.CodeWriter.BuildLinePragma(token.Source.Value);
+                                linePragmaScope = context.CodeWriter.BuildLineDirective(token.Source.Value);
                             }
 
                             context.CodeWriter.WritePadding(0, token.Source.Value, context);
@@ -298,7 +291,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
                 EndWriterScope(context);
             }
 
-            context.CodeWriter.WriteEndMethodInvocation(false);
+            context.CodeWriter.WriteEndMethodCall(false);
 
             context.CodeWriter
                 .WriteParameterSeparator()
@@ -306,8 +299,8 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
                 .WriteParameterSeparator()
                 .Write(valueLength.ToString(CultureInfo.InvariantCulture))
                 .WriteParameterSeparator()
-                .WriteBooleanLiteral(false)
-                .WriteEndMethodInvocation();
+                .Write("false")
+                .WriteEndMethodCall();
         }
 
         public override void WriteHtmlContent(CodeRenderingContext context, HtmlContentIntermediateNode node)
@@ -342,9 +335,9 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
                 }
 
                 context.CodeWriter
-                    .WriteStartMethodInvocation(WriteHtmlContentMethod)
-                    .WriteStringLiteral(textToRender)
-                    .WriteEndMethodInvocation();
+                    .WriteStartMethodCall(WriteHtmlContentMethod)
+                    .WriteStringLiteralExpression(textToRender)
+                    .WriteEndMethodCall();
 
                 charactersConsumed += textToRender.Length;
             }
@@ -352,12 +345,12 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
 
         public override void BeginWriterScope(CodeRenderingContext context, string writer)
         {
-            context.CodeWriter.WriteMethodInvocation(PushWriterMethod, writer);
+            context.CodeWriter.WriteMethodCallExpressionStatement(PushWriterMethod, writer);
         }
 
         public override void EndWriterScope(CodeRenderingContext context)
         {
-            context.CodeWriter.WriteMethodInvocation(PopWriterMethod);
+            context.CodeWriter.WriteMethodCallExpressionStatement(PopWriterMethod);
         }
     }
 }

@@ -13,15 +13,15 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
         {
             if (node.Source.HasValue)
             {
-                using (context.CodeWriter.BuildLinePragma(node.Source.Value))
+                using (context.CodeWriter.BuildLineDirective(node.Source.Value))
                 {
                     context.AddLineMappingFor(node);
-                    context.CodeWriter.WriteUsing(node.Content);
+                    context.CodeWriter.WriteUsingDirective(node.Content);
                 }
             }
             else
             {
-                context.CodeWriter.WriteUsing(node.Content);
+                context.CodeWriter.WriteUsingDirective(node.Content);
             }
         }
 
@@ -44,7 +44,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
 
             if (node.Source != null)
             {
-                using (context.CodeWriter.BuildLinePragma(node.Source.Value))
+                using (context.CodeWriter.BuildLineDirective(node.Source.Value))
                 {
                     var offset = DesignTimeDirectivePass.DesignTimeVariable.Length + " = ".Length;
                     context.CodeWriter.WritePadding(offset, node.Source, context);
@@ -104,7 +104,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             {
                 if (!isWhitespaceStatement)
                 {
-                    linePragmaScope = context.CodeWriter.BuildLinePragma(node.Source.Value);
+                    linePragmaScope = context.CodeWriter.BuildLineDirective(node.Source.Value);
                 }
 
                 context.CodeWriter.WritePadding(0, node.Source.Value, context);
@@ -169,7 +169,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             var firstChild = node.Children[0];
             if (firstChild.Source != null)
             {
-                using (context.CodeWriter.BuildLinePragma(firstChild.Source.Value))
+                using (context.CodeWriter.BuildLineDirective(firstChild.Source.Value))
                 {
                     var offset = DesignTimeDirectivePass.DesignTimeVariable.Length + " = ".Length;
                     context.CodeWriter.WritePadding(offset, firstChild.Source, context);
@@ -229,7 +229,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
                     {
                         if (!isWhitespaceStatement)
                         {
-                            linePragmaScope = context.CodeWriter.BuildLinePragma(token.Source.Value);
+                            linePragmaScope = context.CodeWriter.BuildLineDirective(token.Source.Value);
                         }
 
                         context.CodeWriter.WritePadding(0, token.Source.Value, context);

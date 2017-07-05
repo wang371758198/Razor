@@ -14,7 +14,8 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
     {
         private const string InstanceMethodFormat = "{0}.{1}";
 
-        private static readonly char[] CStyleStringLiteralEscapeChars = {
+        private static readonly char[] CStyleStringLiteralEscapeChars = new char[]
+        {
             '\r',
             '\t',
             '\"',
@@ -28,14 +29,11 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
 
         private static readonly char[] NewLineCharacters = { '\r', '\n' };
 
-        private string _cache = string.Empty;
-        private bool _dirty;
-
         private int _absoluteIndex;
         private int _currentLineIndex;
         private int _currentLineCharacterIndex;
 
-        internal StringBuilder Builder { get; } = new StringBuilder();
+        private StringBuilder Builder { get; } = new StringBuilder();
 
         public int CurrentIndent { get; set; }
 
@@ -45,7 +43,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
 
         public SourceLocation Location => new SourceLocation(_absoluteIndex, _currentLineIndex, _currentLineCharacterIndex);
 
-        // Internal for testing.
+        // Internal for testing
         internal CodeWriter Indent(int size)
         {
             if (IsAfterNewLine)
@@ -55,7 +53,6 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
                 _currentLineCharacterIndex += size;
                 _absoluteIndex += size;
 
-                _dirty = true;
                 IsAfterNewLine = false;
             }
 
@@ -82,8 +79,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             Indent(CurrentIndent);
 
             Builder.Append(data, index, count);
-
-            _dirty = true;
+            
             IsAfterNewLine = false;
 
             _absoluteIndex += count;
@@ -155,7 +151,6 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             _currentLineCharacterIndex = 0;
             _absoluteIndex += NewLine.Length;
 
-            _dirty = true;
             IsAfterNewLine = true;
 
             return this;
@@ -164,17 +159,6 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
         public CodeWriter WriteLine(string data)
         {
             return Write(data).WriteLine();
-        }
-
-        public string GenerateCode()
-        {
-            if (_dirty)
-            {
-                _cache = Builder.ToString();
-                _dirty = false;
-            }
-
-            return _cache;
         }
 
         public CodeWriter WritePadding(int offset, SourceSpan? span, CodeRenderingContext context)
@@ -237,45 +221,18 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             }
         }
 
-        public CodeWriter WriteVariableDeclaration(string type, string name, string value)
+        public string GenerateCode()
         {
-            Write(type).Write(" ").Write(name);
-            if (!string.IsNullOrEmpty(value))
+            return Builder.ToString();
+        }
+
+        public CodeWriter WriteStringLiteralExpression(string literal)
+        {
+            if (literal == null)
             {
-                Write(" = ").Write(value);
-            }
-            else
-            {
-                Write(" = null");
+                throw new ArgumentNullException(nameof(literal));
             }
 
-            WriteLine(";");
-
-            return this;
-        }
-
-        public CodeWriter WriteBooleanLiteral(bool value)
-        {
-            return Write(value.ToString().ToLowerInvariant());
-        }
-
-        public CodeWriter WriteStartAssignment(string name)
-        {
-            return Write(name).Write(" = ");
-        }
-
-        public CodeWriter WriteParameterSeparator()
-        {
-            return Write(", ");
-        }
-
-        public CodeWriter WriteStartNewObject(string typeName)
-        {
-            return Write("new ").Write(typeName).Write("(");
-        }
-
-        public CodeWriter WriteStringLiteral(string literal)
-        {
             if (literal.Length >= 256 && literal.Length <= 1500 && literal.IndexOf('\0') == -1)
             {
                 WriteVerbatimStringLiteral(literal);
@@ -286,311 +243,6 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             }
 
             return this;
-        }
-
-        public CodeWriter WriteUsing(string name)
-        {
-            return WriteUsing(name, endLine: true);
-        }
-
-        public CodeWriter WriteUsing(string name, bool endLine)
-        {
-            Write("using ");
-            Write(name);
-
-            if (endLine)
-            {
-                WriteLine(";");
-            }
-
-            return this;
-        }
-
-        /// <summary>
-        /// Writes a <c>#line</c> pragma directive for the line number at the specified <paramref name="location"/>.
-        /// </summary>
-        /// <param name="location">The location to generate the line pragma for.</param>
-        /// <param name="file">The file to generate the line pragma for.</param>
-        /// <returns>The current instance of <see cref="CodeWriter"/>.</returns>
-        public CodeWriter WriteLineNumberDirective(SourceSpan location, string file)
-        {
-            if (location.FilePath != null)
-            {
-                file = location.FilePath;
-            }
-
-            if (Builder.Length >= NewLine.Length && !IsAfterNewLine)
-            {
-                WriteLine();
-            }
-
-            var lineNumberAsString = (location.LineIndex + 1).ToString(CultureInfo.InvariantCulture);
-            return Write("#line ").Write(lineNumberAsString).Write(" \"").Write(file).WriteLine("\"");
-        }
-
-        public CodeWriter WriteStartMethodInvocation(string methodName)
-        {
-            Write(methodName);
-
-            return Write("(");
-        }
-
-        public CodeWriter WriteEndMethodInvocation()
-        {
-            return WriteEndMethodInvocation(endLine: true);
-        }
-
-        public CodeWriter WriteEndMethodInvocation(bool endLine)
-        {
-            Write(")");
-            if (endLine)
-            {
-                WriteLine(";");
-            }
-
-            return this;
-        }
-
-        // Writes a method invocation for the given instance name.
-        public CodeWriter WriteInstanceMethodInvocation(
-            string instanceName,
-            string methodName,
-            params string[] parameters)
-        {
-            if (instanceName == null)
-            {
-                throw new ArgumentNullException(nameof(instanceName));
-            }
-
-            if (methodName == null)
-            {
-                throw new ArgumentNullException(nameof(methodName));
-            }
-
-            return WriteInstanceMethodInvocation(instanceName, methodName, endLine: true, parameters: parameters);
-        }
-
-        // Writes a method invocation for the given instance name.
-        public CodeWriter WriteInstanceMethodInvocation(
-            string instanceName,
-            string methodName,
-            bool endLine,
-            params string[] parameters)
-        {
-            if (instanceName == null)
-            {
-                throw new ArgumentNullException(nameof(instanceName));
-            }
-
-            if (methodName == null)
-            {
-                throw new ArgumentNullException(nameof(methodName));
-            }
-
-            return WriteMethodInvocation(
-                string.Format(CultureInfo.InvariantCulture, InstanceMethodFormat, instanceName, methodName),
-                endLine,
-                parameters);
-        }
-
-        public CodeWriter WriteStartInstanceMethodInvocation(string instanceName, string methodName)
-        {
-            if (instanceName == null)
-            {
-                throw new ArgumentNullException(nameof(instanceName));
-            }
-
-            if (methodName == null)
-            {
-                throw new ArgumentNullException(nameof(methodName));
-            }
-
-            return WriteStartMethodInvocation(
-                string.Format(CultureInfo.InvariantCulture, InstanceMethodFormat, instanceName, methodName));
-        }
-
-        public CodeWriter WriteField(IList<string> modifiers, string typeName, string fieldName)
-        {
-            if (modifiers == null)
-            {
-                throw new ArgumentNullException(nameof(modifiers));
-            }
-
-            if (typeName == null)
-            {
-                throw new ArgumentNullException(nameof(typeName));
-            }
-
-            if (fieldName == null)
-            {
-                throw new ArgumentNullException(nameof(fieldName));
-            }
-
-            for (var i = 0; i < modifiers.Count; i++)
-            {
-                Write(modifiers[i]);
-                Write(" ");
-            }
-
-            Write(typeName);
-            Write(" ");
-            Write(fieldName);
-            Write(";");
-            WriteLine();
-
-            return this;
-        }
-
-        public CodeWriter WriteMethodInvocation(string methodName, params string[] parameters)
-        {
-            return WriteMethodInvocation(methodName, endLine: true, parameters: parameters);
-        }
-
-        public CodeWriter WriteMethodInvocation(string methodName, bool endLine, params string[] parameters)
-        {
-            return WriteStartMethodInvocation(methodName)
-                .Write(string.Join(", ", parameters))
-                .WriteEndMethodInvocation(endLine);
-        }
-
-        public CodeWriter WriteAutoPropertyDeclaration(IList<string> modifiers, string typeName, string propertyName)
-        {
-            if (modifiers == null)
-            {
-                throw new ArgumentNullException(nameof(modifiers));
-            }
-
-            if (typeName == null)
-            {
-                throw new ArgumentNullException(nameof(typeName));
-            }
-
-            if (propertyName == null)
-            {
-                throw new ArgumentNullException(nameof(propertyName));
-            }
-
-            for (var i = 0; i < modifiers.Count; i++)
-            {
-                Write(modifiers[i]);
-                Write(" ");
-            }
-
-            Write(typeName);
-            Write(" ");
-            Write(propertyName);
-            Write(" { get; set; }");
-            WriteLine();
-
-            return this;
-        }
-
-        public CSharpCodeWritingScope BuildScope()
-        {
-            return new CSharpCodeWritingScope(this);
-        }
-
-        public CSharpCodeWritingScope BuildLambda(params string[] parameterNames)
-        {
-            return BuildLambda(async: false, parameterNames: parameterNames);
-        }
-
-        public CSharpCodeWritingScope BuildAsyncLambda(params string[] parameterNames)
-        {
-            return BuildLambda(async: true, parameterNames: parameterNames);
-        }
-
-        private CSharpCodeWritingScope BuildLambda(bool async, string[] parameterNames)
-        {
-            if (async)
-            {
-                Write("async");
-            }
-
-            Write("(").Write(string.Join(", ", parameterNames)).Write(") => ");
-
-            var scope = new CSharpCodeWritingScope(this);
-
-            return scope;
-        }
-
-        public CSharpCodeWritingScope BuildNamespace(string name)
-        {
-            Write("namespace ").WriteLine(name);
-
-            return new CSharpCodeWritingScope(this);
-        }
-
-        public CSharpCodeWritingScope BuildClassDeclaration(
-            IList<string> modifiers,
-            string name,
-            string baseType,
-            IEnumerable<string> interfaces)
-        {
-            for (var i = 0; i < modifiers.Count; i++)
-            {
-                Write(modifiers[i]);
-                Write(" ");
-            }
-
-            Write("class ");
-            Write(name);
-
-            var hasBaseType = !string.IsNullOrEmpty(baseType);
-            var hasInterfaces = interfaces != null && interfaces.Count() > 0;
-
-            if (hasBaseType || hasInterfaces)
-            {
-                Write(" : ");
-
-                if (hasBaseType)
-                {
-                    Write(baseType);
-
-                    if (hasInterfaces)
-                    {
-                        WriteParameterSeparator();
-                    }
-                }
-
-                if (hasInterfaces)
-                {
-                    Write(string.Join(", ", interfaces));
-                }
-            }
-
-            WriteLine();
-
-            return new CSharpCodeWritingScope(this);
-        }
-
-        public CSharpCodeWritingScope BuildMethodDeclaration(
-            string accessibility,
-            string returnType,
-            string name,
-            IEnumerable<KeyValuePair<string, string>> parameters)
-        {
-            Write(accessibility)
-                .Write(" ")
-                .Write(returnType)
-                .Write(" ")
-                .Write(name)
-                .Write("(")
-                .Write(string.Join(", ", parameters.Select(p => p.Key + " " + p.Value)))
-                .WriteLine(")");
-
-            return new CSharpCodeWritingScope(this);
-        }
-
-        public IDisposable BuildLinePragma(SourceSpan? span)
-        {
-            if (string.IsNullOrEmpty(span?.FilePath))
-            {
-                // Can't build a valid line pragma without a file path.
-                return NullDisposable.Default;
-            }
-
-            return new LinePragmaWriter(this, span.Value);
         }
 
         private void WriteVerbatimStringLiteral(string literal)
@@ -673,14 +325,456 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             Write("\"");
         }
 
-        public struct CSharpCodeWritingScope : IDisposable
+        public CodeWriter WriteUsingDirective(string namespaceName)
+        {
+            if (namespaceName == null)
+            {
+                throw new ArgumentNullException(nameof(namespaceName));
+            }
+
+            Write("using ");
+            Write(namespaceName);
+            WriteLine(";");
+
+            return this;
+        }
+
+        public CodeWriter WriteMethodCallExpressionStatement(string methodName)
+        {
+            if (methodName == null)
+            {
+                throw new ArgumentNullException(nameof(methodName));
+            }
+
+            return WriteMethodCallExpressionStatement(methodName, (IList<string>)Array.Empty<string>());
+        }
+
+        public CodeWriter WriteMethodCallExpressionStatement(string methodName, params string[] arguments)
+        {
+            if (methodName == null)
+            {
+                throw new ArgumentNullException(nameof(methodName));
+            }
+
+            if (arguments == null)
+            {
+                throw new ArgumentNullException(nameof(arguments));
+            }
+
+            return WriteMethodCallExpressionStatement(methodName, (IList<string>)arguments);
+        }
+
+        public CodeWriter WriteMethodCallExpressionStatement(string methodName, IList<string> arguments)
+        {
+            if (methodName == null)
+            {
+                throw new ArgumentNullException(nameof(methodName));
+            }
+
+            if (arguments == null)
+            {
+                throw new ArgumentNullException(nameof(arguments));
+            }
+
+            WriteStartMethodCall(methodName);
+
+            for (var i = 0; i < arguments.Count; i++)
+            {
+                Write(arguments[i]);
+                if (i < arguments.Count - 1)
+                {
+                    Write(", ");
+                }
+            }
+
+            WriteEndMethodCall(endLine: false);
+            WriteLine(";");
+
+            return this;
+        }
+
+        public CodeWriter WriteFieldDeclaration(IList<string> modifiers, string typeName, string fieldName)
+        {
+            if (modifiers == null)
+            {
+                throw new ArgumentNullException(nameof(modifiers));
+            }
+
+            if (typeName == null)
+            {
+                throw new ArgumentNullException(nameof(typeName));
+            }
+
+            if (fieldName == null)
+            {
+                throw new ArgumentNullException(nameof(fieldName));
+            }
+
+            return WriteFieldDeclaration(modifiers, typeName, fieldName, null);
+        }
+
+        public CodeWriter WriteFieldDeclaration(IList<string> modifiers, string typeName, string fieldName, string value)
+        {
+            if (modifiers == null)
+            {
+                throw new ArgumentNullException(nameof(modifiers));
+            }
+
+            if (typeName == null)
+            {
+                throw new ArgumentNullException(nameof(typeName));
+            }
+
+            if (fieldName == null)
+            {
+                throw new ArgumentNullException(nameof(fieldName));
+            }
+
+            for (var i = 0; i < modifiers.Count; i++)
+            {
+                Write(modifiers[i]);
+                Write(" ");
+            }
+
+            Write(typeName);
+            Write(" ");
+            Write(fieldName);
+
+            if (value != null)
+            {
+                Write(" = ");
+                Write(value);
+            }
+
+            Write(";");
+            WriteLine();
+
+            return this;
+        }
+
+        public CodeWriter WriteAutoPropertyDeclaration(IList<string> modifiers, string typeName, string propertyName)
+        {
+            if (modifiers == null)
+            {
+                throw new ArgumentNullException(nameof(modifiers));
+            }
+
+            if (typeName == null)
+            {
+                throw new ArgumentNullException(nameof(typeName));
+            }
+
+            if (propertyName == null)
+            {
+                throw new ArgumentNullException(nameof(propertyName));
+            }
+
+            for (var i = 0; i < modifiers.Count; i++)
+            {
+                Write(modifiers[i]);
+                Write(" ");
+            }
+
+            Write(typeName);
+            Write(" ");
+            Write(propertyName);
+            Write(" { get; set; }");
+            WriteLine();
+
+            return this;
+        }
+
+        public CSharpBlockScope BuildScope()
+        {
+            return new CSharpBlockScope(this);
+        }
+
+        public CSharpBlockScope BuildLambdaExpression(params string[] parameterNames)
+        {
+            if (parameterNames == null)
+            {
+                throw new ArgumentNullException(nameof(parameterNames));
+            }
+
+            return BuildLambdaExpression(async: false, parameterNames: parameterNames);
+        }
+
+        public CSharpBlockScope BuildAsyncLambdaExpression(params string[] parameterNames)
+        {
+            if (parameterNames == null)
+            {
+                throw new ArgumentNullException(nameof(parameterNames));
+            }
+
+            return BuildLambdaExpression(async: true, parameterNames: parameterNames);
+        }
+
+        private CSharpBlockScope BuildLambdaExpression(bool async, string[] parameterNames)
+        {
+            if (parameterNames == null)
+            {
+                throw new ArgumentNullException(nameof(parameterNames));
+            }
+
+            if (async)
+            {
+                Write("async");
+            }
+
+            Write("(").Write(string.Join(", ", parameterNames)).Write(") => ");
+
+            var scope = new CSharpBlockScope(this);
+
+            return scope;
+        }
+
+        public CSharpBlockScope BuildNamespaceDeclaration(string namespaceName)
+        {
+            if (namespaceName == null)
+            {
+                throw new ArgumentNullException(nameof(namespaceName));
+            }
+
+            Write("namespace ").WriteLine(namespaceName);
+
+            return new CSharpBlockScope(this);
+        }
+
+        public CSharpBlockScope BuildClassDeclaration(IList<string> modifiers, string className)
+        {
+            if (modifiers == null)
+            {
+                throw new ArgumentNullException(nameof(modifiers));
+            }
+
+            if (className == null)
+            {
+                throw new ArgumentNullException(nameof(className));
+            }
+
+            return BuildClassDeclaration(modifiers, className, Array.Empty<string>());
+        }
+
+        public CSharpBlockScope BuildClassDeclaration(
+            IList<string> modifiers,
+            string className,
+            IList<string> baseTypes)
+        {
+            if (modifiers == null)
+            {
+                throw new ArgumentNullException(nameof(modifiers));
+            }
+
+            if (className == null)
+            {
+                throw new ArgumentNullException(nameof(className));
+            }
+
+            if (baseTypes == null)
+            {
+                throw new ArgumentNullException(nameof(baseTypes));
+            }
+
+            for (var i = 0; i < modifiers.Count; i++)
+            {
+                Write(modifiers[i]);
+                Write(" ");
+            }
+
+            Write("class ");
+            Write(className);
+
+            if (baseTypes.Count > 0)
+            {
+                Write(" : ");
+                Write(baseTypes[0]);
+
+                for (var i = 1; i < baseTypes.Count; i++)
+                {
+                    Write(", ");
+                    Write(baseTypes[i]);
+                }
+            }
+
+            WriteLine();
+
+            return new CSharpBlockScope(this);
+        }
+
+        public CSharpBlockScope BuildMethodDeclaration(IList<string> modifiers, string returnType, string methodName)
+        {
+            if (modifiers == null)
+            {
+                throw new ArgumentNullException(nameof(modifiers));
+            }
+
+            if (returnType == null)
+            {
+                throw new ArgumentNullException(nameof(returnType));
+            }
+
+            if (methodName == null)
+            {
+                throw new ArgumentNullException(nameof(methodName));
+            }
+
+            return BuildMethodDeclaration(modifiers, returnType, methodName, Array.Empty<(string, string)>());
+        }
+
+        public CSharpBlockScope BuildMethodDeclaration(
+            IList<string> modifiers,
+            string returnType,
+            string methodName,
+            IList<(string typeName, string parameterName)> parameters)
+        {
+            if (modifiers == null)
+            {
+                throw new ArgumentNullException(nameof(modifiers));
+            }
+
+            if (returnType == null)
+            {
+                throw new ArgumentNullException(nameof(returnType));
+            }
+
+            if (methodName == null)
+            {
+                throw new ArgumentNullException(nameof(methodName));
+            }
+
+            if (parameters == null)
+            {
+                throw new ArgumentNullException(nameof(parameters));
+            }
+
+            for (var i = 0; i < modifiers.Count; i++)
+            {
+                Write(modifiers[i]);
+                Write(" ");
+            }
+
+            Write(returnType)
+                .Write(" ")
+                .Write(methodName)
+                .Write("(")
+                .Write(string.Join(", ", parameters.Select(p => p.typeName + " " + p.parameterName)))
+                .WriteLine(")");
+
+            return new CSharpBlockScope(this);
+        }
+
+        public LineDirectiveScope BuildLineDirective(SourceSpan? span)
+        {
+            return new LineDirectiveScope(this, span);
+        }
+
+        #region The Taylor ZONE
+
+        public CodeWriter WriteStartAssignment(string name)
+        {
+            return Write(name).Write(" = ");
+        }
+
+        public CodeWriter WriteParameterSeparator()
+        {
+            return Write(", ");
+        }
+
+        public CodeWriter WriteStartNewObject(string typeName)
+        {
+            return Write("new ").Write(typeName).Write("(");
+        }
+
+        public CodeWriter WriteStartMethodCall(string methodName)
+        {
+            Write(methodName);
+
+            return Write("(");
+        }
+
+        public CodeWriter WriteEndMethodCall()
+        {
+            return WriteEndMethodCall(endLine: true);
+        }
+
+        public CodeWriter WriteEndMethodCall(bool endLine)
+        {
+            Write(")");
+            if (endLine)
+            {
+                WriteLine(";");
+            }
+
+            return this;
+        }
+
+        // Writes a method invocation for the given instance name.
+        public CodeWriter WriteInstanceMethodCall(
+            string instanceName,
+            string methodName,
+            params string[] parameters)
+        {
+            if (instanceName == null)
+            {
+                throw new ArgumentNullException(nameof(instanceName));
+            }
+
+            if (methodName == null)
+            {
+                throw new ArgumentNullException(nameof(methodName));
+            }
+
+            return WriteMethodCallExpressionStatement(
+                string.Format(CultureInfo.InvariantCulture, InstanceMethodFormat, instanceName, methodName), 
+                parameters);
+        }
+
+        public CodeWriter WriteStartInstanceMethodCall(string instanceName, string methodName)
+        {
+            if (instanceName == null)
+            {
+                throw new ArgumentNullException(nameof(instanceName));
+            }
+
+            if (methodName == null)
+            {
+                throw new ArgumentNullException(nameof(methodName));
+            }
+
+            return WriteStartMethodCall(
+                string.Format(CultureInfo.InvariantCulture, InstanceMethodFormat, instanceName, methodName));
+        }
+
+        public CodeWriter WriteAssignmentStatement(string left, string right)
+        {
+            if (left == null)
+            {
+                throw new ArgumentNullException(nameof(left));
+            }
+
+            if (right == null)
+            {
+                throw new ArgumentNullException(nameof(right));
+            }
+
+            Write(left);
+            Write(" = ");
+            Write(right);
+            WriteLine(";");
+
+            return this;
+        }
+
+        #endregion
+
+        public struct CSharpBlockScope : IDisposable
         {
             private CodeWriter _writer;
             private bool _autoSpace;
             private int _tabSize;
             private int _startIndent;
 
-            public CSharpCodeWritingScope(CodeWriter writer, int tabSize = 4, bool autoSpace = true)
+            public CSharpBlockScope(CodeWriter writer, int tabSize = 4, bool autoSpace = true)
             {
                 _writer = writer;
                 _autoSpace = true;
@@ -728,12 +822,33 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             }
         }
 
-        private class LinePragmaWriter : IDisposable
+        public struct CSharpStatementScope : IDisposable
         {
             private readonly CodeWriter _writer;
-            private readonly int _startIndent;
 
-            public LinePragmaWriter(CodeWriter writer, SourceSpan documentLocation)
+            public CSharpStatementScope(CodeWriter writer)
+            {
+                if (writer == null)
+                {
+                    throw new ArgumentNullException(nameof(writer));
+                }
+
+                _writer = writer;
+            }
+
+            public void Dispose()
+            {
+                _writer.WriteLine(";");
+            }
+        }
+
+        public struct LineDirectiveScope : IDisposable
+        { 
+            private readonly CodeWriter _writer;
+            private readonly int _startIndent;
+            private readonly bool _hasLocation;
+
+            public LineDirectiveScope(CodeWriter writer, SourceSpan? span)
             {
                 if (writer == null)
                 {
@@ -742,44 +857,49 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
 
                 _writer = writer;
                 _startIndent = _writer.CurrentIndent;
-                _writer.CurrentIndent = 0;
-                _writer.WriteLineNumberDirective(documentLocation, documentLocation.FilePath);
+                _hasLocation = span?.FilePath != null;
+
+                if (_hasLocation)
+                {
+                    _writer.CurrentIndent = 0;
+                    WriteLineDirective(span.Value);
+                }
             }
 
-            public void Dispose()
+            private void WriteLineDirective(SourceSpan span)
             {
-                // Need to add an additional line at the end IF there wasn't one already written.
-                // This is needed to work with the C# editor's handling of #line ...
-                var builder = _writer.Builder;
-                var endsWithNewline = builder.Length > 0 && builder[builder.Length - 1] == '\n';
-
-                // Always write at least 1 empty line to potentially separate code from pragmas.
-                _writer.WriteLine();
-
-                // Check if the previous empty line wasn't enough to separate code from pragmas.
-                if (!endsWithNewline)
+                if (_writer.Builder.Length >= _writer.NewLine.Length && !_writer.IsAfterNewLine)
                 {
                     _writer.WriteLine();
                 }
 
-                _writer
-                    .WriteLine("#line default")
-                    .WriteLine("#line hidden");
-
-                _writer.CurrentIndent = _startIndent;
-            }
-        }
-
-        private class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Default = new NullDisposable();
-
-            private NullDisposable()
-            {
+                var lineNumberAsString = (span.LineIndex + 1).ToString(CultureInfo.InvariantCulture);
+                _writer.Write("#line ").Write(lineNumberAsString).Write(" \"").Write(span.FilePath).WriteLine("\"");
             }
 
             public void Dispose()
             {
+                if (_hasLocation)
+                {
+                    // Need to add an additional line at the end IF there wasn't one already written.
+                    // This is needed to work with the C# editor's handling of #line ...
+                    var builder = _writer.Builder;
+                    var endsWithNewline = builder.Length > 0 && builder[builder.Length - 1] == '\n';
+
+                    // Always write at least 1 empty line to potentially separate code from pragmas.
+                    _writer.WriteLine();
+
+                    // Check if the previous empty line wasn't enough to separate code from pragmas.
+                    if (!endsWithNewline)
+                    {
+                        _writer.WriteLine();
+                    }
+
+                    _writer.WriteLine("#line default");
+                    _writer.WriteLine("#line hidden");
+                }
+
+                _writer.CurrentIndent = _startIndent;
             }
         }
     }

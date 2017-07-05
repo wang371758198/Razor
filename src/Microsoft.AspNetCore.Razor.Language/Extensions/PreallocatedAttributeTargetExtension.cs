@@ -31,22 +31,22 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
                 .Write(node.VariableName)
                 .Write(" = ")
                 .WriteStartNewObject("global::" + TagHelperAttributeTypeName)
-                .WriteStringLiteral(node.AttributeName);
+                .WriteStringLiteralExpression(node.AttributeName);
 
             if (node.AttributeStructure == AttributeStructure.Minimized)
             {
-                context.CodeWriter.WriteEndMethodInvocation();
+                context.CodeWriter.WriteEndMethodCall();
             }
             else
             {
                 context.CodeWriter
                     .WriteParameterSeparator()
                     .WriteStartNewObject("global::" + EncodedHtmlStringTypeName)
-                    .WriteStringLiteral(node.Value)
-                    .WriteEndMethodInvocation(endLine: false)
+                    .WriteStringLiteralExpression(node.Value)
+                    .WriteEndMethodCall(endLine: false)
                     .WriteParameterSeparator()
                     .Write($"global::Microsoft.AspNetCore.Razor.TagHelpers.HtmlAttributeValueStyle.{node.AttributeStructure}")
-                    .WriteEndMethodInvocation();
+                    .WriteEndMethodCall();
             }
         }
 
@@ -59,9 +59,9 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
             }
 
             context.CodeWriter
-                .WriteStartInstanceMethodInvocation(ExecutionContextVariableName, ExecutionContextAddHtmlAttributeMethodName)
+                .WriteStartInstanceMethodCall(ExecutionContextVariableName, ExecutionContextAddHtmlAttributeMethodName)
                 .Write(node.VariableName)
-                .WriteEndMethodInvocation();
+                .WriteEndMethodCall();
         }
 
         public void WriteTagHelperPropertyValue(CodeRenderingContext context, PreallocatedTagHelperPropertyValueIntermediateNode node)
@@ -73,12 +73,12 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
                 .Write(node.VariableName)
                 .Write(" = ")
                 .WriteStartNewObject("global::" + TagHelperAttributeTypeName)
-                .WriteStringLiteral(node.AttributeName)
+                .WriteStringLiteralExpression(node.AttributeName)
                 .WriteParameterSeparator()
-                .WriteStringLiteral(node.Value)
+                .WriteStringLiteralExpression(node.Value)
                 .WriteParameterSeparator()
                 .Write($"global::Microsoft.AspNetCore.Razor.TagHelpers.HtmlAttributeValueStyle.{node.AttributeStructure}")
-                .WriteEndMethodInvocation();
+                .WriteEndMethodCall();
         }
 
         public void WriteTagHelperProperty(CodeRenderingContext context, PreallocatedTagHelperPropertyIntermediateNode node)
@@ -108,14 +108,14 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
                     context.CodeWriter
                         .Write("throw ")
                         .WriteStartNewObject(nameof(InvalidOperationException))
-                        .WriteStartMethodInvocation(FormatInvalidIndexerAssignmentMethodName)
-                        .WriteStringLiteral(node.AttributeName)
+                        .WriteStartMethodCall(FormatInvalidIndexerAssignmentMethodName)
+                        .WriteStringLiteralExpression(node.AttributeName)
                         .WriteParameterSeparator()
-                        .WriteStringLiteral(node.TagHelper.GetTypeName())
+                        .WriteStringLiteralExpression(node.TagHelper.GetTypeName())
                         .WriteParameterSeparator()
-                        .WriteStringLiteral(node.Property)
-                        .WriteEndMethodInvocation(endLine: false)   // End of method call
-                        .WriteEndMethodInvocation();   // End of new expression / throw statement
+                        .WriteStringLiteralExpression(node.Property)
+                        .WriteEndMethodCall(endLine: false)   // End of method call
+                        .WriteEndMethodCall();   // End of new expression / throw statement
                 }
             }
 
@@ -124,9 +124,9 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
                 .Write("(string)")
                 .Write($"{node.VariableName}.Value")
                 .WriteLine(";")
-                .WriteStartInstanceMethodInvocation(ExecutionContextVariableName, ExecutionContextAddTagHelperAttributeMethodName)
+                .WriteStartInstanceMethodCall(ExecutionContextVariableName, ExecutionContextAddTagHelperAttributeMethodName)
                 .Write(node.VariableName)
-                .WriteEndMethodInvocation();
+                .WriteEndMethodCall();
         }
 
         private static PreallocatedTagHelperPropertyIntermediateNode FindFirstUseOfIndexer(
