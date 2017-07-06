@@ -143,6 +143,102 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             return this;
         }
 
+        public CodeWriter WriteFormat(FormattableString formattableString)
+        {
+            if (formattableString == null)
+            {
+                throw new ArgumentNullException(nameof(formattableString));
+            }
+
+            Indent(CurrentIndent);
+
+            // We let the string builder implement the actual formatting for us, so we'll need to
+            // update our counts and positions afterwards by looking at the content in the stringbuilder.
+            var start = Builder.Length;
+            IsAfterNewLine = false;
+
+            Builder.AppendFormat(CultureInfo.InvariantCulture, formattableString.Format, formattableString.GetArguments());
+
+            var count = Builder.Length - start;
+            _absoluteIndex += count;
+
+            // The data string might contain a partial newline where the previously
+            // written string has part of the newline.
+            var i = start;
+            int? trailingPartStart = null;
+
+            if (
+                // Check the last character of the previous write operation.
+                Builder.Length - start - 1 >= 0 &&
+                Builder[Builder.Length - start - 1] == '\r' &&
+
+                // Check the first character of the current write operation.
+                Builder.Length > start &&
+                Builder[start] == '\n')
+            {
+                // This is newline that's spread across two writes. Skip the first character of the
+                // current write operation.
+                //
+                // We don't need to increment our newline counter because we already did that when we
+                // saw the \r.
+                i += 1;
+                trailingPartStart = 1;
+            }
+
+            // Iterate the stringbuilder, stopping at each occurrence of a newline character. This lets us count the
+            // newline occurrences and keep the index of the last one.
+            for (; i < Builder.Length; i++)
+            {
+                var c = Builder[i];
+                if (c != '\r' && c != '\n')
+                {
+                    continue;
+                }
+
+                // Newline found.
+                _currentLineIndex++;
+                _currentLineCharacterIndex = 0;
+
+                // We might have stopped at a \r, so check if it's followed by \n and then advance the index to
+                // start the next search after it.
+                if (i -1 >= 0 &&
+                    Builder[i - 1] == '\r' &&
+                    c == '\n')
+                {
+                    i++; // CAUTION, we are indeed incrementing the induction variable here.
+                }
+
+                // The 'suffix' of the current line starts after this newline token.
+                trailingPartStart = i;
+            }
+
+            if (trailingPartStart == null)
+            {
+                // No newlines, just add the length of the data buffer
+                _currentLineCharacterIndex += count;
+            }
+            else
+            {
+                // Newlines found, add the trailing part of 'data'
+                _currentLineCharacterIndex += (count - trailingPartStart.Value);
+            }
+
+            return this;
+        }
+
+        public CodeWriter WriteFormatLine(FormattableString formattableString)
+        {
+            if (formattableString == null)
+            {
+                throw new ArgumentNullException(nameof(formattableString));
+            }
+
+            WriteFormat(formattableString);
+            WriteLine();
+
+            return this;
+        }
+
         public CodeWriter WriteLine()
         {
             Builder.Append(NewLine);
@@ -364,6 +460,31 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             return WriteMethodCallExpressionStatement(methodName, (IList<string>)arguments);
         }
 
+        public CodeWriter WriteInstanceMethodCall(
+            string instanceName,
+            string methodName,
+            params string[] arguments)
+        {
+            if (instanceName == null)
+            {
+                throw new ArgumentNullException(nameof(instanceName));
+            }
+
+            if (methodName == null)
+            {
+                throw new ArgumentNullException(nameof(methodName));
+            }
+
+            if (arguments == null)
+            {
+                throw new ArgumentNullException(nameof(arguments));
+            }
+
+            return WriteMethodCallExpressionStatement(
+                string.Format(CultureInfo.InvariantCulture, InstanceMethodFormat, instanceName, methodName),
+                arguments);
+        }
+
         public CodeWriter WriteMethodCallExpressionStatement(string methodName, IList<string> arguments)
         {
             if (methodName == null)
@@ -376,7 +497,8 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
                 throw new ArgumentNullException(nameof(arguments));
             }
 
-            WriteStartMethodCall(methodName);
+            Write(methodName);
+            Write("(");
 
             for (var i = 0; i < arguments.Count; i++)
             {
@@ -387,7 +509,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
                 }
             }
 
-            WriteEndMethodCall(endLine: false);
+            Write(")");
             WriteLine(";");
 
             return this;
@@ -489,6 +611,19 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             return new CSharpBlockScope(this);
         }
 
+        public CSharpStatementScope BuildAssignmentStatement(string expression)
+        {
+            if (expression == null)
+            {
+                throw new ArgumentNullException(nameof(expression));
+            }
+
+            Write(expression);
+            Write(" = ");
+
+            return new CSharpStatementScope(this);
+        }
+
         public CSharpBlockScope BuildLambdaExpression(params string[] parameterNames)
         {
             if (parameterNames == null)
@@ -526,6 +661,19 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             var scope = new CSharpBlockScope(this);
 
             return scope;
+        }
+
+        public CSharpStatementScope BuildMethodCallExpressionStatement(string methodName)
+        {
+            if (methodName == null)
+            {
+                throw new ArgumentException(nameof(methodName));
+            }
+
+            Write(methodName);
+            Write("(");
+
+            return new CSharpStatementScope(this, ");");
         }
 
         public CSharpBlockScope BuildNamespaceDeclaration(string namespaceName)
@@ -668,105 +816,6 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
             return new LineDirectiveScope(this, span);
         }
 
-        #region The Taylor ZONE
-
-        public CodeWriter WriteStartAssignment(string name)
-        {
-            return Write(name).Write(" = ");
-        }
-
-        public CodeWriter WriteParameterSeparator()
-        {
-            return Write(", ");
-        }
-
-        public CodeWriter WriteStartNewObject(string typeName)
-        {
-            return Write("new ").Write(typeName).Write("(");
-        }
-
-        public CodeWriter WriteStartMethodCall(string methodName)
-        {
-            Write(methodName);
-
-            return Write("(");
-        }
-
-        public CodeWriter WriteEndMethodCall()
-        {
-            return WriteEndMethodCall(endLine: true);
-        }
-
-        public CodeWriter WriteEndMethodCall(bool endLine)
-        {
-            Write(")");
-            if (endLine)
-            {
-                WriteLine(";");
-            }
-
-            return this;
-        }
-
-        // Writes a method invocation for the given instance name.
-        public CodeWriter WriteInstanceMethodCall(
-            string instanceName,
-            string methodName,
-            params string[] parameters)
-        {
-            if (instanceName == null)
-            {
-                throw new ArgumentNullException(nameof(instanceName));
-            }
-
-            if (methodName == null)
-            {
-                throw new ArgumentNullException(nameof(methodName));
-            }
-
-            return WriteMethodCallExpressionStatement(
-                string.Format(CultureInfo.InvariantCulture, InstanceMethodFormat, instanceName, methodName), 
-                parameters);
-        }
-
-        public CodeWriter WriteStartInstanceMethodCall(string instanceName, string methodName)
-        {
-            if (instanceName == null)
-            {
-                throw new ArgumentNullException(nameof(instanceName));
-            }
-
-            if (methodName == null)
-            {
-                throw new ArgumentNullException(nameof(methodName));
-            }
-
-            return WriteStartMethodCall(
-                string.Format(CultureInfo.InvariantCulture, InstanceMethodFormat, instanceName, methodName));
-        }
-
-        public CodeWriter WriteAssignmentStatement(string left, string right)
-        {
-            if (left == null)
-            {
-                throw new ArgumentNullException(nameof(left));
-            }
-
-            if (right == null)
-            {
-                throw new ArgumentNullException(nameof(right));
-            }
-
-            Write(left);
-            Write(" = ");
-            Write(right);
-            WriteLine(";");
-
-            return this;
-        }
-
-        #endregion
-
         public struct CSharpBlockScope : IDisposable
         {
             private CodeWriter _writer;
@@ -825,6 +874,7 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
         public struct CSharpStatementScope : IDisposable
         {
             private readonly CodeWriter _writer;
+            private readonly string _terminator;
 
             public CSharpStatementScope(CodeWriter writer)
             {
@@ -834,11 +884,28 @@ namespace Microsoft.AspNetCore.Razor.Language.CodeGeneration
                 }
 
                 _writer = writer;
+                _terminator = ";";
+            }
+
+            public CSharpStatementScope(CodeWriter writer, string terminator)
+            {
+                if (writer == null)
+                {
+                    throw new ArgumentNullException(nameof(writer));
+                }
+
+                if (terminator == null)
+                {
+                    throw new ArgumentNullException(nameof(terminator));
+                }
+
+                _writer = writer;
+                _terminator = terminator;
             }
 
             public void Dispose()
             {
-                _writer.WriteLine(";");
+                _writer.WriteLine(_terminator);
             }
         }
 

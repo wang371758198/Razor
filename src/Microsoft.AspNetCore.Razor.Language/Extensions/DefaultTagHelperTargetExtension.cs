@@ -290,27 +290,13 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
                     object.ReferenceEquals(FindFirstUseOfIndexer(tagHelperNode, node), node))
                 {
                     // Throw a reasonable Exception at runtime if the dictionary property is null.
-                    context.CodeWriter
-                        .Write("if (")
-                        .Write(node.Field)
-                        .Write(".")
-                        .Write(node.Property)
-                        .WriteLine(" == null)");
+                    context.CodeWriter.WriteFormatLine($"if ({node.Field}.{node.Property} == null)");
                     using (context.CodeWriter.BuildScope())
                     {
                         // System is in Host.NamespaceImports for all MVC scenarios. No need to generate FullName
                         // of InvalidOperationException type.
-                        context.CodeWriter
-                            .Write("throw ")
-                            .WriteStartNewObject(nameof(InvalidOperationException))
-                            .WriteStartMethodCall(FormatInvalidIndexerAssignmentMethodName)
-                            .WriteStringLiteralExpression(node.AttributeName)
-                            .WriteParameterSeparator()
-                            .WriteStringLiteralExpression(node.TagHelper.GetTypeName())
-                            .WriteParameterSeparator()
-                            .WriteStringLiteralExpression(node.Property)
-                            .WriteEndMethodCall(endLine: false)   // End of method call
-                            .WriteEndMethodCall();   // End of new expression / throw statement
+                        context.CodeWriter.WriteFormatLine(
+                            $@"throw new InvalidOperationException({FormatInvalidIndexerAssignmentMethodName}(""{node.AttributeName}"", ""{node.TagHelper.GetTypeName()}"", ""{ node.Property}""));");
                     }
                 }
             }
@@ -326,10 +312,10 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
             if (!object.ReferenceEquals(firstUseOfAttribute, node))
             {
                 // If we get here, this value has already been used. We just need to copy the value.
-                context.CodeWriter
-                    .WriteStartAssignment(GetPropertyAccessor(node))
-                    .Write(GetPropertyAccessor(firstUseOfAttribute))
-                    .WriteLine(";");
+                using (context.CodeWriter.BuildAssignmentStatement(GetPropertyAccessor(node)))
+                {
+                    context.CodeWriter.Write(GetPropertyAccessor(firstUseOfAttribute));
+                }
 
                 return;
             }
@@ -341,17 +327,18 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
                 {
                     context.RenderChildren(node);
 
-                    context.CodeWriter.WriteStartAssignment(GetPropertyAccessor(node));
-                    if (node.Children.Count == 1 && node.Children.First() is HtmlContentIntermediateNode htmlNode)
+                    using (context.CodeWriter.BuildAssignmentStatement(GetPropertyAccessor(node)))
                     {
-                        var content = GetContent(htmlNode);
-                        context.CodeWriter.WriteStringLiteralExpression(content);
+                        if (node.Children.Count == 1 && node.Children.First() is HtmlContentIntermediateNode htmlNode)
+                        {
+                            var content = GetContent(htmlNode);
+                            context.CodeWriter.WriteStringLiteralExpression(content);
+                        }
+                        else
+                        {
+                            context.CodeWriter.Write("string.Empty");
+                        }
                     }
-                    else
-                    {
-                        context.CodeWriter.Write("string.Empty");
-                    }
-                    context.CodeWriter.WriteLine(";");
                 }
                 else
                 {
@@ -359,12 +346,14 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
 
                     context.RenderChildren(node, new LiteralRuntimeNodeWriter());
 
-                    context.CodeWriter
-                        .WriteStartAssignment(StringValueBufferVariableName)
-                        .WriteMethodCallExpressionStatement(EndWriteTagHelperAttributeMethodName)
-                        .WriteStartAssignment(GetPropertyAccessor(node))
-                        .Write(StringValueBufferVariableName)
-                        .WriteLine(";");
+                    using (context.CodeWriter.BuildAssignmentStatement(StringValueBufferVariableName))
+                    {
+                        context.CodeWriter.WriteMethodCallExpressionStatement(EndWriteTagHelperAttributeMethodName);
+                    }
+                    using (context.CodeWriter.BuildAssignmentStatement(StringValueBufferVariableName))
+                    {
+                        context.CodeWriter.Write(StringValueBufferVariableName);
+                    }
                 }
             }
             else
