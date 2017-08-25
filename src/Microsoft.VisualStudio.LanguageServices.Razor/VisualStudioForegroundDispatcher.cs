@@ -7,7 +7,7 @@ using Microsoft.VisualStudio.Shell;
 namespace Microsoft.VisualStudio.LanguageServices.Razor
 {
     [Export(typeof(ForegroundDispatcher))]
-    internal class VisualStudioForegroundDispatcher : ForegroundDispatcher
+    public class VisualStudioForegroundDispatcher : ForegroundDispatcher
     {
         public override bool IsForegroundThread => ThreadHelper.CheckAccess();
     }

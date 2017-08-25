@@ -58,3 +58,11 @@ using Microsoft.VisualStudio.Shell;
     OldVersionLowerBound = "0.0.0.0",
     OldVersionUpperBound = "2.1.0.0",
     NewVersion = "2.1.0.0")]
+
+[assembly: ProvideBindingRedirection(
+    AssemblyName = "Microsoft.VisualStudio.Web.Editors.Razor.4_0",
+    GenerateCodeBase = true,
+    PublicKeyToken = "adb9793829ddae60",
+    OldVersionLowerBound = "0.0.0.0",
+    OldVersionUpperBound = "16.0.0.0",
+    NewVersion = "16.0.0.0")]

@@ -2,18 +2,110 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections.ObjectModel;
+using System.ComponentModel.Composition;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Timers;
 using Microsoft.AspNetCore.Razor.Language;
 using Microsoft.AspNetCore.Razor.Language.Legacy;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Completion;
+using Microsoft.CodeAnalysis.Razor;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
+using Microsoft.VisualStudio.Text.Projection;
 using ITextBuffer = Microsoft.VisualStudio.Text.ITextBuffer;
 using Timer = System.Timers.Timer;
 
 namespace Microsoft.VisualStudio.LanguageServices.Razor.Editor
 {
-    internal class VisualStudioRazorParser : IDisposable
+    public abstract class RazorTextBufferProvider
+    {
+        public abstract bool TryGetFromDocument(TextDocument document, out ITextBuffer textBuffer);
+    }
+
+    [Export(typeof(RazorTextBufferProvider))]
+    internal class DefaultTextBufferProvider : RazorTextBufferProvider
+    {
+        public override bool TryGetFromDocument(TextDocument document, out ITextBuffer textBuffer)
+        {
+            if (document.TryGetText(out var sourceText))
+            {
+                var container = sourceText.Container;
+                var buffer = container.GetTextBuffer();
+
+                if (!buffer.ContentType.IsOfType(RazorLanguage.ContentType))
+                {
+                    Debug.Fail("Could not find the Razor text buffer associated with the source text container.");
+                }
+
+                textBuffer = buffer;
+                return true;
+            }
+
+            // Could not find a text buffer associated with the text document.
+
+            textBuffer = null;
+            return false;
+        }
+    }
+
+    [Export(typeof(CompletionProvider))]
+    [ExportMetadata("Language", LanguageNames.CSharp)]
+    public class RazorDirectiveCompletionProvider : CompletionProvider
+    {
+        private readonly RazorTextBufferProvider _bufferProvider;
+
+        [ImportingConstructor]
+        public RazorDirectiveCompletionProvider(RazorTextBufferProvider bufferProvider)
+        {
+            _bufferProvider = bufferProvider;
+        }
+
+        public override Task ProvideCompletionsAsync(CompletionContext context)
+        {
+            if (!context.Document.FilePath.EndsWith(".cshtml", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult(0);
+            }
+
+            if (_bufferProvider.TryGetFromDocument(context.Document, out var textBuffer))
+            {
+
+            }
+
+            SourceText sourceText;
+            if (context.Document.TryGetText(out sourceText))
+            {
+                ITextSnapshot textSnapshot = sourceText.FindCorrespondingEditorTextSnapshot();
+                IProjectionSnapshot projectionSnapshot = (IProjectionSnapshot)textSnapshot;
+
+                ReadOnlyCollection<SnapshotPoint> mappedPoints = projectionSnapshot.MapToSourceSnapshots(context.CompletionListSpan.Start);
+                SnapshotPoint htmlSnapshotPoint = mappedPoints.FirstOrDefault(p => p.Snapshot.TextBuffer.ContentType.IsOfType("htmlx"));
+                if (htmlSnapshotPoint != null &&
+                    htmlSnapshotPoint.Position > 0 &&
+                    htmlSnapshotPoint.Snapshot[htmlSnapshotPoint.Position - 1] == '@')
+                {
+                    // kinda hacky, should really check to see if it's a transition char
+                    string[] directiveNames = new[] { "addTagHelper", "imports", "section" };
+                    foreach (string directiveName in directiveNames)
+                    {
+                        CompletionItem newItem = CompletionItem.Create(directiveName);
+                        context.AddItem(newItem);
+                    }
+                }
+            }
+
+            return Task.FromResult(0);
+        }
+    }
+
+
+    public class VisualStudioRazorParser : IDisposable
     {
         // Internal for testing.
         internal readonly ITextBuffer _textBuffer;

@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 
 namespace Microsoft.VisualStudio.LanguageServices.Razor
 {
-    internal abstract class ForegroundDispatcher
+    public abstract class ForegroundDispatcher
     {
         public abstract bool IsForegroundThread { get; }
 

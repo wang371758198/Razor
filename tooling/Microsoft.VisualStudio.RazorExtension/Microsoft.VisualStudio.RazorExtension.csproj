@@ -263,6 +263,7 @@
     </VSIXSourceItem>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <VSIXSourceItem Include="C:\Users\nimullen\Documents\TFS\Main\bin\dev15\Debug\Microsoft.VisualStudio.Web.Editors.Razor.4_0.dll" />
     <VSIXSourceItem Include="..\..\src\Microsoft.CodeAnalysis.Remote.Razor\bin\$(Configuration)\net46\Microsoft.CodeAnalysis.Remote.Razor.dll" />
     <VSIXSourceItem Include="..\..\src\Microsoft.AspNetCore.Mvc.Razor.Extensions\bin\$(Configuration)\net46\Microsoft.AspNetCore.Mvc.Razor.Extensions.dll" />
     <VSIXSourceItem Include="..\..\src\Microsoft.AspNetCore.Mvc.Razor.Extensions.Version1_X\bin\$(Configuration)\net46\Microsoft.AspNetCore.Mvc.Razor.Extensions.Version1_X.dll" />
